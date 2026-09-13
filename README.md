@@ -1,104 +1,83 @@
-\# SmartApply – Job Application Tracker
+# B2B RFQ Marketplace
 
+A full-stack B2B Request for Quotation (RFQ) marketplace where buyers can post business requirements and suppliers can discover RFQs and submit quotations.
 
+## Live Application
 
-SmartApply is a full-stack web application that helps users manage and track their job applications in one place.
+Frontend: https://rfq-marketplace-enrg.onrender.com
 
+Backend API: https://rfq-marketplace-api-eb3x.onrender.com
 
+## GitHub Repository
 
-\## Features
+https://github.com/Priyapoluka/smartapply
 
+## Features
 
+### Buyer
 
-\- User registration and login
+- Secure signup and login
+- Create RFQs
+- Edit RFQs
+- Delete RFQs
+- View submitted RFQs
+- View quotations received from suppliers
+- RFQ fields:
+  - Product/service name
+  - Requirement description
+  - Quantity
+  - Delivery location
+  - RFQ deadline
 
-\- Secure password hashing using bcrypt
+### Supplier
 
-\- JWT-based authentication
+- Secure signup and login
+- Browse available RFQs
+- Search RFQs
+- View complete RFQ details
+- Submit quotations
+- View previously submitted quotations
+- Quotation fields:
+  - Quoted price
+  - Estimated delivery time
+  - Message/notes
 
-\- Add job applications
+## Technology Stack
 
-\- Edit existing applications
+### Frontend
 
-\- Delete applications
+- React
+- Vite
+- CSS
+- JavaScript
 
-\- Track application status
+### Backend
 
-\- Filter applications by status
+- Node.js
+- Express.js
+- JWT authentication
+- bcryptjs for password hashing
+- CORS
 
-\- Dashboard with application statistics
+### Database
 
-\- Notes and job application details
+- SQLite
+- better-sqlite3
 
-\- Responsive and clean user interface
+### Deployment
 
+- Render
 
+## Architecture
 
-\## Tech Stack
-
-
-
-\### Frontend
-
-\- React.js
-
-\- Vite
-
-\- CSS
-
-
-
-\### Backend
-
-\- Node.js
-
-\- Express.js
-
-\- REST API
-
-
-
-\### Database
-
-\- SQLite
-
-\- better-sqlite3
-
-
-
-\### Authentication \& Security
-
-\- bcryptjs
-
-\- JSON Web Tokens (JWT)
-
-\- Protected API routes
-
-\- User ownership checks
-
-\- Basic input validation
-
-
-
-\## Application Architecture
-
-
+The application follows a simple client-server architecture.
 
 ```text
-
-React Frontend
-
-&#x20;     |
-
-&#x20;     | REST API
-
-&#x20;     v
-
-Express.js Backend
-
-&#x20;     |
-
-&#x20;     v
-
+React + Vite Frontend
+        |
+        | HTTP REST API
+        v
+Node.js + Express Backend
+        |
+        v
 SQLite Database
-
