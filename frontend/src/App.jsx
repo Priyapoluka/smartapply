@@ -1,74 +1,87 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 
-const API = "http://localhost:5000/api";
+const API =
+  import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [user, setUser] = useState(
     JSON.parse(localStorage.getItem("user") || "null")
   );
-  const [isRegister, setIsRegister] = useState(false);
 
-  if (!token) {
+  const logout = () => {
+    localStorage.clear();
+    setToken(null);
+    setUser(null);
+  };
+
+  if (!token || !user) {
     return (
       <Auth
-        isRegister={isRegister}
-        setIsRegister={setIsRegister}
         setToken={setToken}
         setUser={setUser}
       />
     );
   }
 
-  return (
-    <Dashboard
-      token={token}
-      user={user}
-      logout={() => {
-        localStorage.clear();
-        setToken(null);
-        setUser(null);
-      }}
-    />
+  return user.role === "buyer" ? (
+    <BuyerDashboard token={token} user={user} logout={logout} />
+  ) : (
+    <SupplierDashboard token={token} user={user} logout={logout} />
   );
 }
 
-function Auth({ isRegister, setIsRegister, setToken, setUser }) {
+/* ================= AUTH ================= */
+
+function Auth({ setToken, setUser }) {
+  const [register, setRegister] = useState(false);
   const [form, setForm] = useState({
     name: "",
     email: "",
     password: "",
+    role: "buyer"
   });
-
-  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    setError("");
+    setMessage("");
     setLoading(true);
 
     try {
-      const endpoint = isRegister ? "/auth/register" : "/auth/login";
+      const endpoint = register
+        ? "/auth/register"
+        : "/auth/login";
+
+      const body = register
+        ? form
+        : {
+            email: form.email,
+            password: form.password
+          };
 
       const response = await fetch(API + endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
       });
 
       const data = await response.json();
 
-      if (!response.ok) throw new Error(data.message);
+      if (!response.ok) {
+        throw new Error(data.message || "Something went wrong");
+      }
 
-      if (isRegister) {
-        setIsRegister(false);
-        setError("Registration successful! Please login.");
+      if (register) {
+        setMessage("Account created successfully. Please login.");
+        setRegister(false);
         setForm({
-          name: "",
-          email: form.email,
-          password: "",
+          ...form,
+          password: ""
         });
       } else {
         localStorage.setItem("token", data.token);
@@ -76,8 +89,8 @@ function Auth({ isRegister, setIsRegister, setToken, setUser }) {
         setToken(data.token);
         setUser(data.user);
       }
-    } catch (err) {
-      setError(err.message || "Something went wrong");
+    } catch (error) {
+      setMessage(error.message);
     }
 
     setLoading(false);
@@ -86,18 +99,49 @@ function Auth({ isRegister, setIsRegister, setToken, setUser }) {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <div className="logo">S</div>
-        <h1>SmartApply</h1>
-        <p className="subtitle">Your simple job application tracker</p>
+        <div className="brand-icon">RF</div>
 
-        <form onSubmit={handleSubmit}>
-          {isRegister && (
+        <h1>RFQ Marketplace</h1>
+
+        <p className="subtitle">
+          Connect buyers and suppliers through smarter quotations.
+        </p>
+
+        <div className="auth-tabs">
+          <button
+            type="button"
+            className={!register ? "active-tab" : ""}
+            onClick={() => {
+              setRegister(false);
+              setMessage("");
+            }}
+          >
+            Login
+          </button>
+
+          <button
+            type="button"
+            className={register ? "active-tab" : ""}
+            onClick={() => {
+              setRegister(true);
+              setMessage("");
+            }}
+          >
+            Register
+          </button>
+        </div>
+
+        <form onSubmit={submit}>
+          {register && (
             <input
               type="text"
               placeholder="Full name"
               value={form.name}
               onChange={(e) =>
-                setForm({ ...form, name: e.target.value })
+                setForm({
+                  ...form,
+                  name: e.target.value
+                })
               }
               required
             />
@@ -108,44 +152,69 @@ function Auth({ isRegister, setIsRegister, setToken, setUser }) {
             placeholder="Email address"
             value={form.email}
             onChange={(e) =>
-              setForm({ ...form, email: e.target.value })
+              setForm({
+                ...form,
+                email: e.target.value
+              })
             }
             required
           />
 
           <input
             type="password"
-            placeholder="Password"
+            placeholder="Password (min 6 characters)"
             value={form.password}
             onChange={(e) =>
-              setForm({ ...form, password: e.target.value })
+              setForm({
+                ...form,
+                password: e.target.value
+              })
             }
-            required
             minLength={6}
+            required
           />
 
-          {error && <div className="message">{error}</div>}
+          {register && (
+            <select
+              value={form.role}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  role: e.target.value
+                })
+              }
+            >
+              <option value="buyer">Buyer</option>
+              <option value="supplier">Supplier</option>
+            </select>
+          )}
 
-          <button type="submit" disabled={loading}>
+          {message && (
+            <div className="message">
+              {message}
+            </div>
+          )}
+
+          <button className="primary-btn" disabled={loading}>
             {loading
               ? "Please wait..."
-              : isRegister
+              : register
               ? "Create Account"
               : "Login"}
           </button>
         </form>
 
-        <p className="switch">
-          {isRegister
+        <p className="switch-text">
+          {register
             ? "Already have an account?"
             : "Don't have an account?"}{" "}
           <span
             onClick={() => {
-              setIsRegister(!isRegister);
-              setError("");
+              setRegister(!register);
+              setMessage("");
             }}
           >
-            {isRegister ? "Login" : "Register"}
+            {register ? "Login" : "Register"}
           </span>
         </p>
       </div>
@@ -153,223 +222,244 @@ function Auth({ isRegister, setIsRegister, setToken, setUser }) {
   );
 }
 
-function Dashboard({ token, user, logout }) {
-  const [applications, setApplications] = useState([]);
+/* ================= BUYER ================= */
+
+function BuyerDashboard({ token, user, logout }) {
+  const [rfqs, setRfqs] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [filter, setFilter] = useState("All");
+  const [selectedRfq, setSelectedRfq] = useState(null);
+  const [message, setMessage] = useState("");
 
   const emptyForm = {
-    company: "",
-    job_title: "",
-    job_url: "",
-    status: "Applied",
-    applied_date: "",
-    notes: "",
+    product_name: "",
+    description: "",
+    quantity: "",
+    delivery_location: "",
+    deadline: ""
   };
 
   const [form, setForm] = useState(emptyForm);
 
-  const fetchApplications = async () => {
-    const response = await fetch(`${API}/applications`, {
+  const fetchRfqs = async () => {
+    const response = await fetch(`${API}/my-rfqs`, {
       headers: {
-        Authorization: `Bearer ${token}`,
-      },
+        Authorization: `Bearer ${token}`
+      }
     });
 
     const data = await response.json();
 
     if (response.ok) {
-      setApplications(data);
+      setRfqs(data);
     }
   };
 
   useEffect(() => {
-    fetchApplications();
+    fetchRfqs();
   }, []);
 
-  const saveApplication = async (e) => {
+  const saveRfq = async (e) => {
     e.preventDefault();
+    setMessage("");
 
     const url = editingId
-      ? `${API}/applications/${editingId}`
-      : `${API}/applications`;
-
-    const method = editingId ? "PUT" : "POST";
+      ? `${API}/rfqs/${editingId}`
+      : `${API}/rfqs`;
 
     const response = await fetch(url, {
-      method,
+      method: editingId ? "PUT" : "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify(form),
+      body: JSON.stringify(form)
     });
 
-    if (response.ok) {
-      setForm(emptyForm);
-      setShowForm(false);
-      setEditingId(null);
-      fetchApplications();
+    const data = await response.json();
+
+    if (!response.ok) {
+      setMessage(data.message);
+      return;
     }
-  };
 
-  const startEdit = (app) => {
-    setForm({
-      company: app.company,
-      job_title: app.job_title,
-      job_url: app.job_url || "",
-      status: app.status,
-      applied_date: app.applied_date || "",
-      notes: app.notes || "",
-    });
+    setMessage(
+      editingId
+        ? "RFQ updated successfully."
+        : "RFQ created successfully."
+    );
 
-    setEditingId(app.id);
-    setShowForm(true);
-  };
-
-  const cancelForm = () => {
     setForm(emptyForm);
     setEditingId(null);
     setShowForm(false);
+    fetchRfqs();
   };
 
-  const deleteApplication = async (id) => {
-    if (!window.confirm("Delete this application?")) return;
-
-    await fetch(`${API}/applications/${id}`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+  const editRfq = (rfq) => {
+    setForm({
+      product_name: rfq.product_name,
+      description: rfq.description,
+      quantity: rfq.quantity,
+      delivery_location: rfq.delivery_location,
+      deadline: rfq.deadline
     });
 
-    fetchApplications();
+    setEditingId(rfq.id);
+    setShowForm(true);
   };
 
-  const filteredApplications =
-    filter === "All"
-      ? applications
-      : applications.filter((app) => app.status === filter);
+  const deleteRfq = async (id) => {
+    if (!window.confirm("Delete this RFQ?")) return;
 
-  const count = (status) =>
-    applications.filter((app) => app.status === status).length;
+    const response = await fetch(`${API}/rfqs/${id}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      setMessage("RFQ deleted successfully.");
+      fetchRfqs();
+    } else {
+      setMessage(data.message);
+    }
+  };
+
+  const viewQuotations = async (id) => {
+    const response = await fetch(`${API}/rfqs/${id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      setSelectedRfq(data);
+    }
+  };
 
   return (
     <div className="dashboard">
-      <header>
-        <div>
-          <h1>SmartApply</h1>
-          <p>Welcome back, {user?.name || "there"} 👋</p>
-        </div>
-
-        <button className="logout" onClick={logout}>
-          Logout
-        </button>
-      </header>
+      <Header
+        user={user}
+        role="Buyer"
+        logout={logout}
+      />
 
       <main>
-        <div className="top-section">
+        <div className="hero-section">
           <div>
-            <h2>Application Dashboard</h2>
-            <p>Track your job search in one place.</p>
+            <p className="eyebrow">BUYER PORTAL</p>
+            <h2>Manage your RFQs</h2>
+            <p>
+              Post business requirements and compare supplier quotations.
+            </p>
           </div>
 
           <button
-            className="add-btn"
+            className="primary-btn"
             onClick={() => {
-              if (showForm) {
-                cancelForm();
-              } else {
-                setForm(emptyForm);
-                setEditingId(null);
-                setShowForm(true);
-              }
+              setShowForm(!showForm);
+              setEditingId(null);
+              setForm(emptyForm);
+              setMessage("");
             }}
           >
-            {showForm ? "Close" : "+ Add Application"}
+            {showForm ? "Close" : "+ Create RFQ"}
           </button>
         </div>
 
-        <div className="stats">
-          <Stat title="Total" value={applications.length} />
-          <Stat title="Applied" value={count("Applied")} />
-          <Stat title="Interviews" value={count("Interview")} />
-          <Stat title="Selected" value={count("Selected")} />
-          <Stat title="Rejected" value={count("Rejected")} />
-        </div>
+        {message && (
+          <div className="success-message">
+            {message}
+          </div>
+        )}
 
         {showForm && (
-          <form className="application-form" onSubmit={saveApplication}>
+          <form className="panel" onSubmit={saveRfq}>
             <h3>
-              {editingId ? "Edit Application" : "Add Job Application"}
+              {editingId ? "Edit RFQ" : "Create New RFQ"}
             </h3>
 
             <div className="form-grid">
               <input
-                placeholder="Company *"
-                value={form.company}
+                placeholder="Product / Service name *"
+                value={form.product_name}
                 onChange={(e) =>
-                  setForm({ ...form, company: e.target.value })
+                  setForm({
+                    ...form,
+                    product_name: e.target.value
+                  })
                 }
                 required
               />
 
               <input
-                placeholder="Job title *"
-                value={form.job_title}
+                placeholder="Quantity *"
+                value={form.quantity}
                 onChange={(e) =>
-                  setForm({ ...form, job_title: e.target.value })
+                  setForm({
+                    ...form,
+                    quantity: e.target.value
+                  })
                 }
                 required
               />
 
               <input
-                placeholder="Job URL"
-                value={form.job_url}
+                placeholder="Delivery location *"
+                value={form.delivery_location}
                 onChange={(e) =>
-                  setForm({ ...form, job_url: e.target.value })
+                  setForm({
+                    ...form,
+                    delivery_location: e.target.value
+                  })
                 }
+                required
               />
-
-              <select
-                value={form.status}
-                onChange={(e) =>
-                  setForm({ ...form, status: e.target.value })
-                }
-              >
-                <option>Applied</option>
-                <option>Interview</option>
-                <option>Selected</option>
-                <option>Rejected</option>
-              </select>
 
               <input
                 type="date"
-                value={form.applied_date}
+                value={form.deadline}
                 onChange={(e) =>
-                  setForm({ ...form, applied_date: e.target.value })
+                  setForm({
+                    ...form,
+                    deadline: e.target.value
+                  })
                 }
-              />
-
-              <input
-                placeholder="Notes"
-                value={form.notes}
-                onChange={(e) =>
-                  setForm({ ...form, notes: e.target.value })
-                }
+                required
               />
             </div>
 
+            <textarea
+              placeholder="Requirement description *"
+              value={form.description}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  description: e.target.value
+                })
+              }
+              rows="4"
+              required
+            />
+
             <div className="form-actions">
-              <button type="submit">
-                {editingId ? "Update Application" : "Save Application"}
+              <button className="primary-btn">
+                {editingId ? "Update RFQ" : "Publish RFQ"}
               </button>
 
               <button
                 type="button"
-                className="cancel"
-                onClick={cancelForm}
+                className="secondary-btn"
+                onClick={() => {
+                  setShowForm(false);
+                  setEditingId(null);
+                }}
               >
                 Cancel
               </button>
@@ -377,97 +467,460 @@ function Dashboard({ token, user, logout }) {
           </form>
         )}
 
-        <div className="applications-section">
-          <div className="section-header">
-            <h2>My Applications</h2>
-
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-            >
-              <option>All</option>
-              <option>Applied</option>
-              <option>Interview</option>
-              <option>Selected</option>
-              <option>Rejected</option>
-            </select>
+        <section className="panel">
+          <div className="section-title">
+            <div>
+              <h2>My RFQs</h2>
+              <p>{rfqs.length} requirement(s) posted</p>
+            </div>
           </div>
 
-          {filteredApplications.length === 0 ? (
-            <div className="empty">
-              <div>📋</div>
-              <h3>No applications yet</h3>
-              <p>
-                Click "Add Application" to start tracking your job search.
-              </p>
-            </div>
+          {rfqs.length === 0 ? (
+            <EmptyState text="You haven't posted any RFQs yet." />
           ) : (
-            <div className="application-list">
-              {filteredApplications.map((app) => (
-                <div className="application-card" key={app.id}>
-                  <div>
-                    <h3>{app.job_title}</h3>
-                    <p className="company">{app.company}</p>
+            <div className="rfq-list">
+              {rfqs.map((rfq) => (
+                <div className="rfq-card" key={rfq.id}>
+                  <div className="rfq-main">
+                    <div className="badge buyer-badge">
+                      RFQ #{rfq.id}
+                    </div>
 
-                    {app.applied_date && (
-                      <p className="date">
-                        Applied: {app.applied_date}
-                      </p>
-                    )}
+                    <h3>{rfq.product_name}</h3>
 
-                    {app.notes && (
-                      <p className="notes">{app.notes}</p>
-                    )}
+                    <p>{rfq.description}</p>
 
-                    {app.job_url && (
-                      <a
-                        href={app.job_url}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        View Job →
-                      </a>
-                    )}
+                    <div className="rfq-meta">
+                      <span>📦 {rfq.quantity}</span>
+                      <span>📍 {rfq.delivery_location}</span>
+                      <span>⏰ Deadline: {rfq.deadline}</span>
+                    </div>
                   </div>
 
-                  <div className="card-right">
-                    <span
-                      className={`status ${app.status.toLowerCase()}`}
+                  <div className="card-actions">
+                    <button
+                      className="secondary-btn"
+                      onClick={() => viewQuotations(rfq.id)}
                     >
-                      {app.status}
-                    </span>
+                      Quotations
+                    </button>
 
-                    <div className="card-buttons">
-                      <button
-                        className="edit"
-                        onClick={() => startEdit(app)}
-                      >
-                        Edit
-                      </button>
+                    <button
+                      className="edit-btn"
+                      onClick={() => editRfq(rfq)}
+                    >
+                      Edit
+                    </button>
 
-                      <button
-                        className="delete"
-                        onClick={() => deleteApplication(app.id)}
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    <button
+                      className="delete-btn"
+                      onClick={() => deleteRfq(rfq.id)}
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </div>
+        </section>
+
+        {selectedRfq && (
+          <QuotationPanel
+            data={selectedRfq}
+            close={() => setSelectedRfq(null)}
+          />
+        )}
       </main>
     </div>
   );
 }
 
-function Stat({ title, value }) {
+/* ================= SUPPLIER ================= */
+
+function SupplierDashboard({ token, user, logout }) {
+  const [rfqs, setRfqs] = useState([]);
+  const [search, setSearch] = useState("");
+  const [selectedRfq, setSelectedRfq] = useState(null);
+  const [quotations, setQuotations] = useState([]);
+  const [showQuote, setShowQuote] = useState(false);
+  const [quote, setQuote] = useState({
+    quoted_price: "",
+    delivery_time: "",
+    message: ""
+  });
+  const [message, setMessage] = useState("");
+
+  const fetchRfqs = async (term = "") => {
+    const response = await fetch(
+      `${API}/rfqs?search=${encodeURIComponent(term)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    );
+
+    const data = await response.json();
+
+    if (response.ok) {
+      setRfqs(data);
+    }
+  };
+
+  const fetchQuotations = async () => {
+    const response = await fetch(`${API}/my-quotations`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      setQuotations(data);
+    }
+  };
+
+  useEffect(() => {
+    fetchRfqs();
+    fetchQuotations();
+  }, []);
+
+  const openRfq = async (id) => {
+    const response = await fetch(`${API}/rfqs/${id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      setSelectedRfq(data.rfq);
+      setShowQuote(false);
+      setMessage("");
+    }
+  };
+
+  const submitQuote = async (e) => {
+    e.preventDefault();
+    setMessage("");
+
+    const response = await fetch(
+      `${API}/rfqs/${selectedRfq.id}/quotations`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(quote)
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      setMessage(data.message);
+      return;
+    }
+
+    setMessage("Quotation submitted successfully.");
+    setQuote({
+      quoted_price: "",
+      delivery_time: "",
+      message: ""
+    });
+    setShowQuote(false);
+    fetchQuotations();
+  };
+
   return (
-    <div className="stat-card">
-      <p>{title}</p>
-      <strong>{value}</strong>
+    <div className="dashboard">
+      <Header
+        user={user}
+        role="Supplier"
+        logout={logout}
+      />
+
+      <main>
+        <div className="hero-section">
+          <div>
+            <p className="eyebrow">SUPPLIER PORTAL</p>
+            <h2>Find business opportunities</h2>
+            <p>
+              Discover RFQs and submit competitive quotations.
+            </p>
+          </div>
+        </div>
+
+        {message && (
+          <div className="success-message">
+            {message}
+          </div>
+        )}
+
+        <section className="panel">
+          <div className="section-title">
+            <div>
+              <h2>Available RFQs</h2>
+              <p>Browse requirements posted by buyers.</p>
+            </div>
+
+            <div className="search-box">
+              <input
+                placeholder="Search RFQs..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  fetchRfqs(e.target.value);
+                }}
+              />
+            </div>
+          </div>
+
+          {rfqs.length === 0 ? (
+            <EmptyState text="No RFQs found." />
+          ) : (
+            <div className="rfq-list">
+              {rfqs.map((rfq) => (
+                <div className="rfq-card" key={rfq.id}>
+                  <div className="rfq-main">
+                    <div className="badge supplier-badge">
+                      OPEN RFQ
+                    </div>
+
+                    <h3>{rfq.product_name}</h3>
+
+                    <p>{rfq.description}</p>
+
+                    <div className="rfq-meta">
+                      <span>📦 {rfq.quantity}</span>
+                      <span>📍 {rfq.delivery_location}</span>
+                      <span>⏰ {rfq.deadline}</span>
+                    </div>
+
+                    <small>
+                      Posted by {rfq.buyer_name}
+                    </small>
+                  </div>
+
+                  <button
+                    className="primary-btn"
+                    onClick={() => openRfq(rfq.id)}
+                  >
+                    View Details
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="panel">
+          <div className="section-title">
+            <div>
+              <h2>My Quotations</h2>
+              <p>Track quotations you've submitted.</p>
+            </div>
+          </div>
+
+          {quotations.length === 0 ? (
+            <EmptyState text="You haven't submitted any quotations yet." />
+          ) : (
+            <div className="quote-list">
+              {quotations.map((item) => (
+                <div className="quote-card" key={item.id}>
+                  <div>
+                    <h3>{item.product_name}</h3>
+                    <p>{item.message || "No additional message."}</p>
+                  </div>
+
+                  <div className="quote-info">
+                    <strong>₹{item.quoted_price}</strong>
+                    <span>{item.delivery_time}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {selectedRfq && (
+          <div className="modal-backdrop">
+            <div className="modal">
+              <button
+                className="modal-close"
+                onClick={() => setSelectedRfq(null)}
+              >
+                ×
+              </button>
+
+              <div className="badge supplier-badge">
+                RFQ DETAILS
+              </div>
+
+              <h2>{selectedRfq.product_name}</h2>
+
+              <p>{selectedRfq.description}</p>
+
+              <div className="detail-grid">
+                <div>
+                  <strong>Quantity</strong>
+                  <span>{selectedRfq.quantity}</span>
+                </div>
+
+                <div>
+                  <strong>Location</strong>
+                  <span>{selectedRfq.delivery_location}</span>
+                </div>
+
+                <div>
+                  <strong>Deadline</strong>
+                  <span>{selectedRfq.deadline}</span>
+                </div>
+
+                <div>
+                  <strong>Buyer</strong>
+                  <span>{selectedRfq.buyer_name}</span>
+                </div>
+              </div>
+
+              {!showQuote ? (
+                <button
+                  className="primary-btn full-width"
+                  onClick={() => setShowQuote(true)}
+                >
+                  Submit Quotation
+                </button>
+              ) : (
+                <form onSubmit={submitQuote}>
+                  <h3>Submit Your Quotation</h3>
+
+                  <input
+                    type="number"
+                    min="1"
+                    step="0.01"
+                    placeholder="Quoted price (₹) *"
+                    value={quote.quoted_price}
+                    onChange={(e) =>
+                      setQuote({
+                        ...quote,
+                        quoted_price: e.target.value
+                      })
+                    }
+                    required
+                  />
+
+                  <input
+                    placeholder="Estimated delivery time *"
+                    value={quote.delivery_time}
+                    onChange={(e) =>
+                      setQuote({
+                        ...quote,
+                        delivery_time: e.target.value
+                      })
+                    }
+                    required
+                  />
+
+                  <textarea
+                    placeholder="Message / notes"
+                    rows="4"
+                    value={quote.message}
+                    onChange={(e) =>
+                      setQuote({
+                        ...quote,
+                        message: e.target.value
+                      })
+                    }
+                  />
+
+                  <button className="primary-btn full-width">
+                    Submit Quote
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
+/* ================= COMPONENTS ================= */
+
+function Header({ user, role, logout }) {
+  return (
+    <header className="app-header">
+      <div>
+        <div className="header-brand">
+          <span>RF</span>
+          <h1>RFQ Marketplace</h1>
+        </div>
+
+        <p>
+          Welcome, {user.name} · <strong>{role}</strong>
+        </p>
+      </div>
+
+      <button className="logout-btn" onClick={logout}>
+        Logout
+      </button>
+    </header>
+  );
+}
+
+function EmptyState({ text }) {
+  return (
+    <div className="empty-state">
+      <div className="empty-icon">📋</div>
+      <h3>{text}</h3>
+      <p>Check back later for new activity.</p>
+    </div>
+  );
+}
+
+function QuotationPanel({ data, close }) {
+  return (
+    <div className="modal-backdrop">
+      <div className="modal">
+        <button
+          className="modal-close"
+          onClick={close}
+        >
+          ×
+        </button>
+
+        <div className="badge buyer-badge">
+          QUOTATIONS
+        </div>
+
+        <h2>{data.rfq.product_name}</h2>
+
+        {data.quotations.length === 0 ? (
+          <EmptyState text="No quotations received yet." />
+        ) : (
+          <div className="quote-list">
+            {data.quotations.map((quote) => (
+              <div className="quote-card" key={quote.id}>
+                <div>
+                  <h3>{quote.supplier_name}</h3>
+                  <p>{quote.message || "No message."}</p>
+                  <small>{quote.supplier_email}</small>
+                </div>
+
+                <div className="quote-info">
+                  <strong>₹{quote.quoted_price}</strong>
+                  <span>{quote.delivery_time}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
